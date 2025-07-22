@@ -14,7 +14,7 @@ const connectDB = async () => {  //async isiliye kiye kyuki database se baat krn
 export default connectDB;
 
 
-//CHATGPT Answer
+//CHATGPT Answer:- it is also correct
 // import mongoose from "mongoose";
 
 // const connectDB = async () => {
