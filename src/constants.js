@@ -1,1 +1,1 @@
-export const DB_NAME="videotube"
+export const DB_NAME="videotube"  //constant mein application ke database ka naam
