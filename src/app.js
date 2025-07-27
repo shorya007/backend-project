@@ -14,5 +14,13 @@ app.use(express.urlencoded({extended: true, limit: "16kb"})) //url ka encoder ha
 app.use(express.static("public"))  //public folder ke liye
 app.use(cookieParser())
 
+//routes ko yaha import kro
+import userRouter from './routes/user.routes.js'
 
-export { app }
+//routes declaration
+// yaha app.get pehlr likhet the kyuki hum pehle yhi pe routes aur controoler likhte the par kyuki hum cheeze seperate kar chuke hai toh yaha pe hum ab middleware laenfge
+app.use("/api/v1/Users",userRouter) //ab agar koi v user type krega (/Users) toh hum control, dedenge userRouter ko
+
+// http://localhost:8000/api/v1/Users/register //is tarah ka route hum bana rhe hai
+
+export default app;

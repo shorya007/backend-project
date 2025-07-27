@@ -1,6 +1,8 @@
-const asyncHandler = (requesthandler) => {
-    (req,res,next) => {
-        Promise.resolve(requesthandler(req,res,next)).catch((err) => next(err))
+//ye ek helper file hai which catches error automatically
+
+const asyncHandler = (requestHandler) => {
+    return (req,res,next) => {  // yaha bug aaya tha humne return hee nhi kara tha method ko
+        Promise.resolve(requestHandler(req,res,next)).catch((err) => next(err))
     }
 }
 
