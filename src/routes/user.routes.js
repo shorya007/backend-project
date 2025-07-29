@@ -4,9 +4,24 @@
 
 import { Router } from "express";
 import { registerUser } from "../controllers/user.controller.js";
+import {upload} from "../middlewares/multer.middleware.js"  //is upload ka use kaha krna hai middleware inject krne ke liye
 
 const router = Router()
 
-router.route("/register").post(registerUser);  //
+router.route("/register").post(
+    upload.fields([  //Jab user registration ke time images bhejta hai (jaise avatar ya coverImage), toh un files ko process karne ke liye yeh middleware zaroori hota hai.
+        {
+            name:"avatar",
+            maxCount:1
+        },
+        {
+            name: "coverImage",
+            maxCount: 1
+        }
+    ]),  //ye krne ke baad hum images vej payenge
+    //Agar tum upload.fields() ko registerUser ke baad likhte, toh file upload hone se pehle hi registerUser function chal jaata — jisme tumhare req.files ya req.body incomplete ya undefined hote.
+
+    registerUser 
+);  
 
 export default router;

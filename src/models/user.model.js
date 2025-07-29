@@ -6,7 +6,7 @@ const userSchema = new Schema(
     {
         username:{
             type: String,
-            requird:true,
+            required:true,
             unique:true,
             lowercase:true,
             trim:true,
@@ -14,22 +14,22 @@ const userSchema = new Schema(
         },
         email:{
             type: String,
-            requird:true,
+            required:true,
             unique:true,
             lowercase:true,
             trim:true,
         },
         fullName:{
             type: String,
-            requird:true,
+            required:true,
             trim:true,
             index:true
         },
         avatar:{
-            type: tring,  // cloudinary url(files,image upload krke url dedeta hai)
-            requird:true,
+            type: String,  // cloudinary url(files,image upload krke url dedeta hai)
+            required:true,
         },
-        coyerImage:{
+        coverImage:{
             type: String,
         },
         watchHistory:[  // array hai kyuki multiple values add krenge
@@ -54,7 +54,7 @@ const userSchema = new Schema(
 userSchema.pre("save", async function(next){//Mongoose middleware (hook)-{pre} run beofre docs save in mongodb
     if(!this.isModified("password")) return next();  //agar modified nhi hua toh nilo
 
-    this.password = bcrypt.hash(this.password, 10)  //agar modified ho gya toh change kro
+    this.password = await bcrypt.hash(this.password, 10)  //agar modified ho gya toh change kro
     next()
 })
 
@@ -88,5 +88,7 @@ userSchema.methods.generateRefreshToken = function(){
     )
 }
 
-export const user = mongoose.model("User", userSchema)
+const User = mongoose.model("User", userSchema);
+export default User;
+ //ye User database se direct contact kr skta hai kuki ye mongoose ke through banahai  User hee hamare behalf pe mongoDB ko call krega
 
