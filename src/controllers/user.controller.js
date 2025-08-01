@@ -201,6 +201,8 @@ const logoutUser  = asyncHandler(async(req,res) => {
     .json(new ApiResponse(200, {}, "User logged out"))
 })
 
+
+//creating an endpoint
 const refreshAccessToken = asyncHandler(async( req, res) => {
     const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
     if(incomingRefreshToken){
