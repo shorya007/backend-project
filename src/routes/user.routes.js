@@ -3,7 +3,7 @@
 //yaha user ke routes rkh rhe hain jaise registerUser , login etc
 
 import { Router } from "express";
-import { loginUser, logoutUser, registerUser } from "../controllers/user.controller.js";
+import { loginUser, logoutUser, registerUser,refreshAccessToken } from "../controllers/user.controller.js";
 import {upload} from "../middlewares/multer.middleware.js"  //is upload ka use kaha krna hai middleware inject krne ke liye
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
@@ -29,5 +29,6 @@ router.route("/login").post(loginUser)
 
 //secured routes
 router.route("/logout").post(verifyJWT, logoutUser)  //verifyJWT, logoutUser ke run hone se phle chlega
+router.route("/refresh-token").post(refreshAccessToken)
 
 export default router;

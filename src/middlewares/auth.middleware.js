@@ -2,7 +2,8 @@
 import jwt from "jsonwebtoken"
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { User } from "../models/user.model.js"
+import User from "../models/user.model.js";
+
 export const verifyJWT = asyncHandler(async(req, _, next) => {  //Express middleware function
     
     try {
@@ -18,7 +19,7 @@ export const verifyJWT = asyncHandler(async(req, _, next) => {  //Express middle
     
     
         if(!user) { //Agar token to valid tha, lekin uss ID ka user ab DB me nahi hai (deleted etc.), to access deny
-            //TODO: discuss about frontend
+            
             throw new ApiError(401, "Invalis Access Token")
         }
     
