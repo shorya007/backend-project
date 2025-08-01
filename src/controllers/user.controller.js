@@ -29,7 +29,7 @@ const registerUser = asyncHandler( async (req , res)=>{ //registerUser is wrappe
 
     if (!fullName || !email || !username || !password) {
     throw new ApiError(400, "All fields are required");
-}
+    }
 
 
     const existedUser=await User.findOne({  //check if user is already existed 
@@ -88,4 +88,119 @@ console.log("req.files:", req.files);
     )
 })
 
-export { registerUser }; // named export
+const generateAccessAndRefreshTokens = async(userId)=>{
+    try {
+        const user = await User.findById(userId)  //isse user ka document aa gaay ahai
+        const accessToken = user.generateAccessToken() //isko hum user ko dedete hain
+        const refreshToken=user.generateRefreshToken()  //isko hum DB mein v save krke rkhte hain
+
+        user.refreshToken = refreshToken  //object ke andar value add kr rhe hain
+        await user.save({validateBeforeSave: false})  //mongoDB ke karan save ka option hai
+
+        return {accessToken,refreshToken}
+    
+    } catch (error) {
+        throw new ApiError(500, "Something went wrong while generating refresh and access token")
+    }
+    //Refresh token ek long-lived token hota hai jo user ke paas rehta hai.
+    //Jab access token expire ho jaata hai, toh refresh token ke through naya access token milta hai without login again
+    
+}
+
+
+//Cookies are small pieces of data stored on the user's browser by websites. They are mainly used to remember information about the user between visits    
+
+const loginUser = asyncHandler( async (req,res) => {
+    //STEPS :
+    //1.) request body se data le aao
+    //2.) username or email
+    //3.) find the user  {user hai ki nahi humare pass}
+    //4.) password check   {agar user hai toh password check karao}
+    //5.) access and efresh token generate krke user ko vejo {agar password shi hai toh}
+    //6.) ab in tokens ko vejo cookies mein
+    //7.) at last send respnse of login successfull
+
+    const {email,username,password} = req.body  
+
+    if(!(username || email)){   //ek chaiye user ko aage badhne ke liye
+        throw new ApiError(400, "username or password is required")
+    }
+
+    const user = await User.findOne({   //findOne:-jaise hee pehla document milega mongoDB mein wo waapas kr deta hai
+        $or: [{username}, {email}]  //or mein hum array ke andar object pass kr skte hai or find krega user ko ya toh username ke basis pe mil jaye ya email ke basis pe 
+    })  
+
+    if(!user){
+        throw new ApiError(404,"user does not exist")
+    }
+
+    const isPasswordValid = await user.isPasswordCorrect(password) //ab agar paswword thik hoga toh thue ya falswe valur aa jaegi
+
+    if(!isPasswordValid){
+        throw new ApiError(401,"Invalid user credetials")
+    }
+
+    const {accessToken,refreshToken} = await generateAccessAndRefreshTokens(user._id)  //User ke ID (user._id) ke basis par Access Token aur Refresh Token generate karna.
+
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")  //Database se user ka data laana, lekin password aur refreshToken ko hata ke.
+
+    const options  = {  //cookies jab v vejt ho tb options design krne hote hain cookies ke
+        httpOnly: true,  
+        secure: true
+        //in dono ko true krne ke baad ye bas server se modify hogi
+
+    }
+    return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken",refreshToken,options)
+    .json(
+        new ApiResponse(
+            200,
+            {
+                user:loggedInUser,accessToken,refreshToken
+            },
+            "user logged in successfully"
+        )
+    )
+})
+
+
+const logoutUser  = asyncHandler(async(req,res) => {
+    //STEPS
+    //1.) cookies clear krne pparega
+    //2.) refresh token reset kr do aur fir jab koi login kre toh usko naya refreshtoken milega
+    //PROBLEM:- logout krne time Userid toh nhi le skte nhi toh koi v email daal ke logout ho jaega login krte time user le aaye the lyuli hamare pass email password sb tha
+    //solution:- apna middleware(jane se pehle milke jaiyega) design krenge (auth.middleware.js)
+
+    //// STEP 1: Remove refresh token from DB
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set:{
+                refreshToken: undefined
+            }
+        },
+        {
+            new: true  //isse new updated value milegi
+        }
+        
+    )
+    
+    // STEP 2: Clear cookies with secure options
+    const options  = {  //cookies jab v vejt ho tb options design krne hote hain cookies ke
+        httpOnly: true,  
+        secure: true
+        //in dono ko true krne ke baad ye bas server se modify hogi
+    }
+    return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logged out"))
+})
+export {
+    registerUser,
+    loginUser,
+    logoutUser
+ }; // named export

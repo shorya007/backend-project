@@ -62,7 +62,7 @@ userSchema.methods.isPasswordCorrect=async function(password){
     return await bcrypt.compare(password, this.password)  //return krta hai true and false, (await)- coz of computation
 }
 
-userSchema.methods.generateAccessToken = function(){
+userSchema.methods.generateAccessToken = function(){  //it is short lived, expired in short duration
     return jwt.sign(
         {
             _id: this._id,
@@ -76,7 +76,7 @@ userSchema.methods.generateAccessToken = function(){
         }
     )
 }
-userSchema.methods.generateRefreshToken = function(){
+userSchema.methods.generateRefreshToken = function(){  //it is long lived, expired in long duration
     return jwt.sign(
         {
             _id: this._id,
