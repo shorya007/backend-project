@@ -203,25 +203,29 @@ const logoutUser  = asyncHandler(async(req,res) => {
 
 
 //creating an endpoint
+//Yeh refreshAccessToken ek controller function hai jo JWT-based authentication mein refresh token se naya access token generate karta hai.
+// Step 1: Refresh token client se lo
 const refreshAccessToken = asyncHandler(async( req, res) => {
     const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
-    if(incomingRefreshToken){
-        throw new ApiError(401,"unauthoruized request")
+    if(!incomingRefreshToken){  // agar token nahi mila to unauthorized.
+    throw new ApiError(401,"unauthorized request")
     }
 
     //ab inconming token ko verify kraenge jwt se
+    //Step 2: Token ko verify karo (JWT)
 
-    try {
+    try {  
         const decodedToken = jwt.verify(
             incomingRefreshToken,
             process.env.REFRESH_TOKEN_SECRET
         )  //VERIFY HONE KE BAAD DECODEDTOKEN MILEGA
+        //🔹 Step 3: User ko DB se dhundo
         const user = await User.findById(decodedToken?._id)
         if(!user){
             throw new ApiError(401,"invalid refresh token")
     
         }
-    
+        //Step 4: Token match karo database ke token se
         if(incomingRefreshToken !== user?.refreshToken){
             throw new ApiError(401,"refresh token is expired or used")
         }
@@ -230,13 +234,14 @@ const refreshAccessToken = asyncHandler(async( req, res) => {
             httpOnly: true,
             secure: true
         }
-    
+        //Step 5: Naya token banao
         const {accessToken,newrefreshToken} = await generateAccessAndRefreshTokens(user._id)
-    
-        return response
+         
+        // Step 6: Token cookies me bhejo + response return karo
+        return res
         .status(200)
         .cookie("accessToken", accessToken,options)
-        .cookie("refreshToken", refreshToken,options)
+        .cookie("refreshToken", newrefreshToken,options)
         .json(
             new ApiResponse(
                 200, 
@@ -244,6 +249,7 @@ const refreshAccessToken = asyncHandler(async( req, res) => {
                 "Access token refreshed"
             )
         )
+    //step 7: Agar token verify nahi hua, ya koi bhi galti aayi, to error throw karega.
     } catch (error) {
         throw new ApiError(401,error?.message || "Invalid refresh token")
         
