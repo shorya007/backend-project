@@ -257,9 +257,131 @@ const refreshAccessToken = asyncHandler(async( req, res) => {
 
 
 })
+
+//isme hums user se current password change krne ka process
+const changeCurrentPassword = asyncHandler(async(req,res) => {
+    // Step 1: Extract Passwords from Request
+    const {oldPassword, newPassword} = req.body
+
+    //Step 2: Find User {req.user middleware (auth.middleware.js) se aata hai — means user already authenticated hai.
+    //Uski ID se user ko database me search kar rahe hain.}
+    const user = await User.findById(req.user?._id) //middleware se check kiye (req.user)
+
+    //Step 3: Verify Old Password
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+    if(!isPasswordCorrect) {
+        throw new ApiError(400,"invalid old password")
+    }
+    
+    // Step 4: Save New Password
+    user.password = newPassword
+    await user.save({validateBeforeSave: false})
+    return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "password changfed sucessfully"))
+
+})
+
+//Your getCurrentUser function aims to return the currently logged-in user's data
+const getCurrentUser = asyncHandler(async(req,res)=> {
+    return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "current user fetched successfully"))
+})
+
+const updateAccountDetails = asyncHandler(async(req,res) => {
+    const {fullName, email} = req.body  // Step 1: Get updated data from user
+    //Step 2: Validation
+    if(!fullName || !email){
+        throw new ApiError(400, "All fields are required")
+    }
+    
+    // Step 3: Update user details in DB
+    const user = User.findByIdAndUpdate( //Yeh Mongoose ka method hai jo:id se user ko dhoondta hai,uska data update karta hai,aur (agar new: true diya ho) updated document return karta hai.
+
+       req.user?._id,
+        {
+            $set:{ //Ye MongoDB ka $set operator hai.Iska matlab hai:"User ka fullName aur email ko naye values se update karo."Agar aisa karte hai: { fullName, email }, to woh puri document ko overwrite kar deta. Isliye $set safe hai.
+                fullName,
+                email,
+                
+            }
+        },
+        {new: true}  //isse updated document return hota hai.
+
+    ).select("-password")
+    //Step 5: Send Success Response
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user, "account details updated sucessfully"))
+})
+
+//updateUserAvatar function ek user ka profile picture (avatar) update karta hai — using multer and Cloudinary
+const updateUserAvatar = asyncHandler(async(req,res) => {
+    // / Step 1: Get Local Path from Multer
+    const avatarLocalPath = req.file?.path //multer ne local pe upload kr di hogi
+
+    //Step 2: Check if File is Missing
+    if(!avatarLocalPath){
+        throw new ApiError(400, "Avatar file is missing")
+    }
+    // Step 3: Upload to Cloudinary and it will return the url
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
+    if (!avatar.url) {  
+        throw new ApiError(400, "Error while uploading on avatar")
+    }
+    // Step 5: Save Avatar URL in DB
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                avatar: avatar.url
+            }
+        },
+        {new: true}
+    ).select("-password")
+    return res
+        .status(200)
+        .json(new ApiResponse(200, avatar.url, "Avatar updated successfully"));
+})
+
+
+const updateUserCoverImage = asyncHandler(async(req,res) => {
+    // / Step 1: Get Local Path from Multer
+    const coverImageLocalPath = req.file?.path //multer ne local pe upload kr di hogi
+
+    //Step 2: Check if File is Missing
+    if(!coverImageLocalPath){
+        throw new ApiError(400, "Cover Image file is missing")
+    }
+    // Step 3: Upload to Cloudinary and it will return the url
+    const coverImage= await uploadOnCloudinary(coverImageLocalPath)
+    if (!coverImage.url) {  
+        throw new ApiError(400, "Error while uploading on image")
+    }
+    // Step 5: Save coverImage URL in DB
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                coverImage: coverImage.url
+            }
+        },
+        {new: true}
+    ).select("-password")
+    return res
+        .status(200)
+        .json(new ApiResponse(200, coverImage.url, "coverImage updated successfully"));
+})
+
 export {
     registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateUserCoverImage
  }; // named export
