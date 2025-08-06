@@ -8,6 +8,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import { response } from "express";
+import mongoose from "mongoose";
 
 const registerUser = asyncHandler( async (req , res)=>{ //registerUser is wrapped inside asyncHandler, which means: If any error occurs inside the async function, it will be automatically caught and passed to the Express error handler.
     
@@ -43,7 +44,7 @@ const registerUser = asyncHandler( async (req , res)=>{ //registerUser is wrappe
 
     // console.log(req.files);
     console.log("req.body:", req.body);
-console.log("req.files:", req.files);
+    console.log("req.files:", req.files);
     
 
     const avatarLocalPath = req.files?.avatar[0]?.path //Ye line ek safe way hai to access the uploaded avatar image file’s path
@@ -374,6 +375,145 @@ const updateUserCoverImage = asyncHandler(async(req,res) => {
         .json(new ApiResponse(200, coverImage.url, "coverImage updated successfully"));
 })
 
+//AGGREGATION PIPELINE FOR SUBSCRIBERS SUBSCRIEBD 
+const getUserChannelProfile = asyncHandler(async(req, res)=>{
+    const {username} = req.params
+
+    if (!username?.trim) {
+        throw new ApiError(400, "username is missing")
+    }
+    //User.find({username}) //isme db se ek baar user lenge poora fir uski id ke basis pe aggration lagaenge
+
+    //direct AGGREGATION mein match field hota hai wo saare documents mein se ek documents find kar lega
+    const channel = await User.aggregate([ //aggregation pipeline likhne ke baad arrays aata hain
+        {
+            $match:{
+                username: username?.toLowerCase() //Yeh stage filter karta hai User collection se jis user ka username match kare provided username se.
+            }  //yaha pe hum ek document laae (e.g. chaiaurcode channel) ab chaiaurcode kaq subscriber find karna hai
+        },
+        {
+            $lookup: {  //channel(total chaiaurcode kitna hai) ke count se subscriber mil jaega
+                from: "Subscription", //kaha se dekhna chahte ho subscription.model.js se aaya hai,
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers" 
+            }
+        },
+        {
+            $lookup: {  //maine kis ko subscribe kr rkha hai
+                from: "Subscription", 
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribedTo"
+
+            }
+        },
+        {
+            $addFields: {
+                subscribersCount: {
+                    $size: "$subscribers", //subscribers ek field  hai(lookup) ka isiliye '$' use kiya
+                },
+                channelsSubscribedToCount: {
+                    $size : "$subscribedTo"
+
+                },
+                isSubscribed: {
+                    $cond:{
+                        if: {$in: [req.user?._id, "$subscribers.subscriber"]},//Check karo kya req.user._id subscribers array ke andar kisi object ke subscriber field me hai ya nahi
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        },
+        {
+            $project: {  //Isme hum specify karte hain ki kaunse fields output me chahiye.Sirf selected fields ko allow karta hai — baaki sab ignore ho jaata hai.
+                fullName: 1,
+                username: 1,
+                subscribersCount:1,
+                channelsSubscribedToCount:1,
+                isSubscribed: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1
+
+            }
+        }
+    ])
+
+    if(!channel?.length){  //agar channel hee nhi hai toh,  Agar channel ya to undefined/null hai ya uski length 0 hai, to condition true banegi
+        throw new ApiError(404, "channel does not exist")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, channel[0],"user channel fetched successfully") //Since aggregation ek array return karta hai, hum first object channel[0] ko client ko bhejte hain.
+    )
+
+})
+
+//Logged-in user ke watchHistory me stored video IDs ko fetch karo — aur un videos ke owner info bhi include karo.
+const getWatchHistory = asyncHandler(async(req,res) => {
+    const user = await User.aggregate([
+        {
+            //STEP:1) current Logged-in user dhoondta hai
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user._id)
+            }
+        },
+        {
+            //STEP:2) Watch history me jo video IDs stored hain, unke details videos collection se laaye ja rahe hain.Is lookup ke andar ek pipeline use ho rahi hai — matlab sub-aggregation.
+            $lookup: {
+                from:"videos",
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [  //sub-pipeline
+                    {
+                        //Har video ka owner ek user hota hai.Is lookup se us owner ka fullName, username, avatar laaye ja rahe hain.pipeline ke through sirf ye fields hi fetch ho rahe hain.
+                        $lookup: {
+                            from: "user",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        fullName: 1,
+                                        username: 1,
+                                        avatar: 1,
+
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        $addFields:{ //lookup ka result array hota hai.Yeh step ensure karta hai ki owner ek single object ban jaaye, na ki array.
+                            owner:{
+                                $first: "$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    return res
+    .status(200)
+    .json(
+        //user ek array return karta hai aggregation ke through.Hum user[0] se watchHistory access karke client ko bhej dete hain.
+        new ApiResponse(
+            200,
+            user[0].watchHistory,
+            "watch history fetched successfully"
+        )
+    )
+})
+
+
 export {
     registerUser,
     loginUser,
@@ -383,5 +523,7 @@ export {
     getCurrentUser,
     updateAccountDetails,
     updateUserAvatar,
-    updateUserCoverImage
+    updateUserCoverImage,
+    getUserChannelProfile,
+    getWatchHistory
  }; // named export
